@@ -171,7 +171,13 @@ func (db *Database) Node(hash common.Hash) ([]byte, error)
 ### 添加引用关系
 
 ```go
-func (db *Database) Reference(child common.Hash, parent common.Hash)
+func (db *Database) Reference(child common.Hash, parent common.Hash) {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	db.reference(child, parent)
+}
+func (db *Database) reference(child common.Hash, parent common.Hash) 
 ```
 
 因为root节点是没有parent引用的，为避免被gc掉，认为他的parent是空hash。
@@ -182,6 +188,7 @@ func (db *Database) Reference(child common.Hash, parent common.Hash)
 2. 如果parent节点的children列表中已经包含了child节点，并且child节点不是root节点，直接返回；也就是root节点会重复计数，所以cachedNode的map字段children的值类型用了uint16；
 3. 将child节点的parent字段和parent节点的对应children中的计数器递增；
 
+> 注：root节点允许重复计数的原因是公开的Reference函数支持并发调用(持有了锁)，同一个trie根可能同时很多个routine感兴趣，如果不重复计数的话，当某个routine不感兴趣了进行解引用，会导致这个trie被gc清理掉，其他routine就没得访问了。
 
 
 ### 解除引用
