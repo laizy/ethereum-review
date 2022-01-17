@@ -92,15 +92,15 @@ type journalGenerator struct {
 创建由generateSnapshot函数完成：
 
 1. 先异步构造清理老snapshot的routine；
-2. 保存新的SnapshotRoot,并记录SnapshotGenerator为正在进行清理操作；
+2. 向diskdb保存新的SnapshotRoot,并记录SnapshotGenerator为正在进行清理操作；
 3. 构造出diskLayer结构体，并创建routine，执行diskLayer.generate操作；
-4. 返回构造出的diskLayer
+4. 返回构造出的diskLayer;
 
 
 
 diskLayer.generate函数的流程：
 
-1. 等待清理操作完成；
+1. 如果当前处于清理老snapshot阶段，则等待清理操作完成；
 2. 根据diskLayer.root和diskLayer.triedb构造account trie；
 3. 从diskLayer.genMarker中，解析出当前处理的account hash，并依次迭代账户和账户的存储信息，批量写入账本，并更新diskLayer.genMarker。
 3. 迭代过程中，检查是否被打断，如果打断的话结束构建过程。
@@ -129,7 +129,7 @@ type diffLayer struct {
 }
 ```
 
-字段中的destructSet 比较特殊，因为有的账户删除之后还能重新创建，所有在这个列表中账户也可能存在于其他的字段列表中。当和上一层parent合并的时候先将destructSet的所有账户对应的parent的accountData和storageData等清除掉，然后将destructSet进行合并。其他字段的列表按照正常合并，相同key的值覆盖parent的。
+字段中的destructSet 比较特殊，因为有的账户删除之后还能重新创建，所以在这个列表中账户也可能存在于其他的字段列表中。当和上一层parent合并的时候先将destructSet的所有账户对应的parent的accountData和storageData等清除掉，然后将destructSet进行合并。其他字段的列表按照正常合并，相同key的值覆盖parent的。
 
 另一个字段是diffed，用于跟踪当前layer一直到disk之间的所有layer的所有key的变更，这样可以快速判断是否可以直接跳过所有内存layer,直接从db读取数据。
 
@@ -139,7 +139,7 @@ diffLayer也实现了Snapshot接口，比较简单。
 
 ## snapshot的Journal
 
-journal的作用是为了使进程重启后还能够恢复snapshot的内存diffLayer，当进程退出前会以当前区块高度的root为顶层layer直到diskLayer直接的所有layer做journal操作，将数据写入DB的key为SnapshotJournal中，value的格式：
+journal的作用是为了使进程重启后还能够恢复snapshot的内存diffLayer，当进程退出前会以当前区块高度的root为顶层layer直到diskLayer之间的所有layer做journal操作，将数据写入DB的key为SnapshotJournal中，value的格式：
 
 journalVersion+diskRoot + diffLayer0+... + diffLayerCurrentBlock
 
@@ -190,10 +190,6 @@ type Tree struct {
 2. 加载出Journal和当前的generator状态；
 3. 如果还处于构建，则启动routine继续处理；
 4. 返回生成的tree;
-
-Cap函数用于
-
-
 
 ### diffToDisk函数
 
