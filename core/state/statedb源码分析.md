@@ -763,7 +763,7 @@ func (s *StateDB) Finalise(deleteEmptyObjects bool)
 1. 遍历s.journal.dirties，它中包含了当前所有修改过的账户地址addr，从s.stateObjects中取出obj；
 2. 如果obj.suicided或者obj.empty()，那么标记obj.deleted；如果s.snap非空，那么添加进s.snapDestructs，并删除掉s.snapAcctouts和s.snapStorage的对应记录；
 3. 否则调用obj.finalise，把修改的存储移到pendingStorage中；
-4. 将账户地址添加到s.stateObjectsPending和s.stateObjectsDirty中，前者表示当前区块所有修改过的账户，后者表示当前交易修改的账户。
+4. 将账户地址添加到s.stateObjectsPending和s.stateObjectsDirty中，这两个字段和object里的还不一样：前者跟踪所有修改并finalized但还没提交到trie的账户，后者跟踪所有修改过(不单单是单个交易)并finalized但还没提交到底层DB的账户。
 5. 清理掉journal和refund；
 6. 如果prefetcher打开了的话，预取所有修改的账户；
 
